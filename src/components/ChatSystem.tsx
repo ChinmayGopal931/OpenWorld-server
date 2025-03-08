@@ -1,8 +1,6 @@
-
 // file: src/components/game/ChatSystem.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import multiplayerClient from '../services/MultiPlayerClient';
-
 
 interface ChatMessage {
   id: string;
@@ -19,10 +17,28 @@ const ChatSystem: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [playerNames, setPlayerNames] = useState<Map<string, string>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  
-  // Handle incoming chat messages
+  const playerNamesRef = useRef<Map<string, string>>(new Map());
+  const isOpenRef = useRef<boolean>(false);
+
+  // Sync refs with state
   useEffect(() => {
-    // System message for startup
+    playerNamesRef.current = playerNames;
+  }, [playerNames]);
+  
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    console.log('[ChatSystem] Initializing chat system');
+    
     const systemMessage: ChatMessage = {
       id: `system_${Date.now()}`,
       playerId: 'system',
@@ -35,15 +51,19 @@ const ChatSystem: React.FC = () => {
     setMessages([systemMessage]);
     
     const handleChatMessage = (playerId: string, username: string, message: string) => {
-      setMessages(prev => [...prev, {
-        id: `msg_${Date.now()}_${Math.random()}`,
-        playerId,
-        username,
-        message,
-        timestamp: Date.now()
-      }]);
+      console.log(`[ChatSystem] Received message from ${username}: "${message}"`);
       
-      // Update player names map
+      setMessages(prev => {
+        const newMessage = {
+          id: `msg_${Date.now()}_${Math.random()}`,
+          playerId,
+          username,
+          message,
+          timestamp: Date.now()
+        };
+        return [...prev, newMessage];
+      });
+      
       setPlayerNames(prev => {
         const newNames = new Map(prev);
         newNames.set(playerId, username);
@@ -51,22 +71,23 @@ const ChatSystem: React.FC = () => {
       });
     };
     
-    // Handle player joins for the chat system
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handlePlayerJoin = (player: any) => {
-      // Add welcome message
+      console.log(`[ChatSystem] Player joined: ${player.username} (${player.id})`);
+      
       if (player.id !== multiplayerClient.getPlayerId()) {
-        setMessages(prev => [...prev, {
-          id: `join_${Date.now()}_${player.id}`,
-          playerId: 'system',
-          username: 'System',
-          message: `${player.username} joined the game`,
-          timestamp: Date.now(),
-          isSystem: true
-        }]);
+        setMessages(prev => {
+          const joinMessage = {
+            id: `join_${Date.now()}_${player.id}`,
+            playerId: 'system',
+            username: 'System',
+            message: `${player.username} joined the game`,
+            timestamp: Date.now(),
+            isSystem: true
+          };
+          return [...prev, joinMessage];
+        });
       }
       
-      // Track player name
       setPlayerNames(prev => {
         const newNames = new Map(prev);
         newNames.set(player.id, player.username);
@@ -74,20 +95,22 @@ const ChatSystem: React.FC = () => {
       });
     };
     
-    // Handle player leaves
     const handlePlayerLeave = (playerId: string) => {
-      const playerName = playerNames.get(playerId) || 'Unknown player';
+      const playerName = playerNamesRef.current.get(playerId) || 'Unknown player';
+      console.log(`[ChatSystem] Player left: ${playerName} (${playerId})`);
       
-      setMessages(prev => [...prev, {
-        id: `leave_${Date.now()}_${playerId}`,
-        playerId: 'system',
-        username: 'System',
-        message: `${playerName} left the game`,
-        timestamp: Date.now(),
-        isSystem: true
-      }]);
+      setMessages(prev => {
+        const leaveMessage = {
+          id: `leave_${Date.now()}_${playerId}`,
+          playerId: 'system',
+          username: 'System',
+          message: `${playerName} left the game`,
+          timestamp: Date.now(),
+          isSystem: true
+        };
+        return [...prev, leaveMessage];
+      });
       
-      // Remove from player names
       setPlayerNames(prev => {
         const newNames = new Map(prev);
         newNames.delete(playerId);
@@ -95,22 +118,15 @@ const ChatSystem: React.FC = () => {
       });
     };
     
-    // Register event handlers
     multiplayerClient.onChatMessage(handleChatMessage);
     multiplayerClient.onPlayerJoin(handlePlayerJoin);
     multiplayerClient.onPlayerLeave(handlePlayerLeave);
     
-    // Auto-scroll chat when new messages arrive
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    // Toggle chat with Enter key
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !isOpen) {
+      if (e.key === 'Enter' && !isOpenRef.current) {
         e.preventDefault();
         setIsOpen(true);
-      } else if (e.key === 'Escape' && isOpen) {
+      } else if (e.key === 'Escape' && isOpenRef.current) {
         e.preventDefault();
         setIsOpen(false);
       }
@@ -119,29 +135,21 @@ const ChatSystem: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     
     return () => {
+      console.log('[ChatSystem] Cleaning up event handlers');
       multiplayerClient.offChatMessage(handleChatMessage);
       multiplayerClient.offPlayerJoin(handlePlayerJoin);
       multiplayerClient.offPlayerLeave(handlePlayerLeave);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, playerNames]);
-  
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-  
-  // Send a chat message
+  }, []); // Empty dependency array ensures this runs once on mount
+
   const sendMessage = () => {
     if (input.trim()) {
       multiplayerClient.sendChatMessage(input.trim());
       setInput('');
     }
   };
-  
-  // Handle input submission
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -164,10 +172,9 @@ const ChatSystem: React.FC = () => {
         borderRadius: '8px',
         padding: '10px',
         color: 'white',
-        zIndex: 1500
+        zIndex: 9999
       }}
     >
-      {/* Message display area */}
       <div
         style={{
           maxHeight: isOpen ? '250px' : '120px',
@@ -176,7 +183,7 @@ const ChatSystem: React.FC = () => {
           fontSize: '14px'
         }}
       >
-        {messages.slice(-8).map(msg => (
+        {messages.map(msg => ( // Removed slice to show all messages
           <div key={msg.id} style={{ marginBottom: '5px' }}>
             {msg.isSystem ? (
               <div style={{ color: '#a3e635', fontSize: '12px', fontStyle: 'italic' }}>
@@ -199,7 +206,6 @@ const ChatSystem: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Input box - only visible when chat is open */}
       {isOpen && (
         <div style={{ display: 'flex' }}>
           <input

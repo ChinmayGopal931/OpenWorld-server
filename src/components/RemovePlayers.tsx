@@ -28,12 +28,19 @@ const RemotePlayers: React.FC<RemotePlayersProps> = ({ cameraPosition }) => {
     
     // Handler for players leaving
     const handlePlayerLeave = (playerId: string) => {
+      console.log(`[RemotePlayers] Player left: ${playerId}`);
+      
       setPlayers(prevPlayers => {
+        if (!prevPlayers.has(playerId)) {
+          console.warn(`[RemotePlayers] Tried to remove nonexistent player: ${playerId}`);
+          return prevPlayers;
+        }
+        
         const newPlayers = new Map(prevPlayers);
         newPlayers.delete(playerId);
+        console.log(`[RemotePlayers] Removed player ${playerId}, remaining: ${newPlayers.size}`);
         return newPlayers;
       });
-      console.log(`Player left: ${playerId}`);
     };
     
     // Handler for player movement
@@ -43,24 +50,31 @@ const RemotePlayers: React.FC<RemotePlayersProps> = ({ cameraPosition }) => {
       direction: Direction, 
       isMoving: boolean
     ) => {
+      // Log occasionally to avoid spamming
+      if (Math.random() < 0.05) {
+        console.log(`[RemotePlayers] Player ${playerId} moved to (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
+      }
+      
       setPlayers(prevPlayers => {
-        const newPlayers = new Map(prevPlayers);
-        const player = newPlayers.get(playerId);
+        const player = prevPlayers.get(playerId);
         
-        if (player) {
-          newPlayers.set(playerId, {
-            ...player,
-            position,
-            direction,
-            isMoving,
-            lastUpdate: Date.now()
-          });
+        if (!player) {
+          console.warn(`[RemotePlayers] Received movement for unknown player: ${playerId}`);
+          return prevPlayers;
         }
+        
+        const newPlayers = new Map(prevPlayers);
+        newPlayers.set(playerId, {
+          ...player,
+          position,
+          direction,
+          isMoving,
+          lastUpdate: Date.now()
+        });
         
         return newPlayers;
       });
     };
-    
     // Register event handlers
     multiplayerClient.onPlayerJoin(handlePlayerJoin);
     multiplayerClient.onPlayerLeave(handlePlayerLeave);

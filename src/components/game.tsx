@@ -245,7 +245,6 @@ export const Game: React.FC = () => {
         
         {/* Remote players */}
         <RemotePlayers cameraPosition={cameraPosition} />
-        
         {/* Main player character */}
         <Character
           position={{
@@ -348,7 +347,7 @@ const gameStyles = {
     padding: '8px 12px',
     borderRadius: '16px',
     fontSize: '14px',
-    zIndex: 1000,
+    zIndex: 99999,
   },
   playerInfo: {
     position: 'absolute' as const,
@@ -359,6 +358,6 @@ const gameStyles = {
     padding: '8px 12px',
     borderRadius: '16px',
     fontSize: '12px',
-    zIndex: 1000,
+    zIndex: 99999,
   },
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import multiplayerService from '../services/MultiplayerService';
 import { Player, GameEventType } from '../utils/game';
+import multiplayerService from '../services/MultiplayerService';
 
 
 interface OtherPlayersProps {
@@ -21,22 +21,35 @@ const OtherPlayers: React.FC<OtherPlayersProps> = ({ cameraPosition }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handlePlayerJoin = (event: any) => {
       const { player } = event.data;
+      console.log(`[OtherPlayers] Player join event received:`, player);
+      
       if (player.id !== multiplayerService.getPlayerId()) {
+        console.log(`[OtherPlayers] Adding player ${player.username} (${player.id}) to local state`);
         setPlayers(prevPlayers => {
           const newPlayers = new Map(prevPlayers);
           newPlayers.set(player.id, player);
+          console.log(`[OtherPlayers] Players map updated, count: ${newPlayers.size}`);
           return newPlayers;
         });
+      } else {
+        console.log(`[OtherPlayers] Ignoring own player join event`);
       }
     };
+
     
     // Handle player leave events
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handlePlayerLeave = (event: any) => {
       const { playerId } = event.data;
+      console.log(`[OtherPlayers] Player leave event received for ${playerId}`);
+      
       setPlayers(prevPlayers => {
         const newPlayers = new Map(prevPlayers);
+        const playerExists = newPlayers.has(playerId);
+        console.log(`[OtherPlayers] Player ${playerId} exists in local state: ${playerExists}`);
+        
         newPlayers.delete(playerId);
+        console.log(`[OtherPlayers] Players map updated after delete, count: ${newPlayers.size}`);
         return newPlayers;
       });
     };
@@ -47,6 +60,11 @@ const OtherPlayers: React.FC<OtherPlayersProps> = ({ cameraPosition }) => {
       const { playerId, position, direction, isMoving } = event.data;
       
       if (playerId !== multiplayerService.getPlayerId()) {
+        // Log only 5% of movements to avoid console spam
+        if (Math.random() < 0.05) {
+          console.log(`[OtherPlayers] Movement update for player ${playerId} at (${position.x}, ${position.y})`);
+        }
+        
         setPlayers(prevPlayers => {
           const newPlayers = new Map(prevPlayers);
           const player = newPlayers.get(playerId);
@@ -60,12 +78,15 @@ const OtherPlayers: React.FC<OtherPlayersProps> = ({ cameraPosition }) => {
               lastUpdate: Date.now(),
               animationFrame: player.animationFrame
             });
+          } else {
+            console.warn(`[OtherPlayers] Received movement for unknown player ${playerId}`);
           }
           
           return newPlayers;
         });
       }
     };
+    
     
     // Register event handlers
     multiplayerService.on(GameEventType.PLAYER_JOIN, handlePlayerJoin);
@@ -107,6 +128,22 @@ const OtherPlayers: React.FC<OtherPlayersProps> = ({ cameraPosition }) => {
       }
     };
   }, []); // Empty dependency array - this effect runs once on mount
+
+  const lastRenderCountRef = useRef<number>(0);
+
+    
+  // Add logging on render to track player rendering
+  useEffect(() => {
+    if (players.size !== lastRenderCountRef.current) {
+      console.log(`[OtherPlayers] Player count changed: ${lastRenderCountRef.current} -> ${players.size}`);
+      if (players.size > 0) {
+        console.log('[OtherPlayers] Current players:', Array.from(players.entries()));
+      }
+      lastRenderCountRef.current = players.size;
+    }
+  }, [players]);
+  
+
   
   // Render each player character
   const renderPlayerCharacter = (player: Player) => {

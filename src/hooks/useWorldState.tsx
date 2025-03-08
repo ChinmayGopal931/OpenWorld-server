@@ -186,7 +186,7 @@ export const useWorldState = (config: GameConfig, playerPosition: Position) => {
     
     for (const chunk of loadedChunksRef.current.values()) {
       // Add visible elements from this chunk
-      visibleElements.trees.push(...chunk.trees.filter(isElementVisible));
+      // visibleElements.trees.push(...chunk.trees.filter(isElementVisible));
       // visibleElements.bushes.push(...chunk.bushes.filter(isElementVisible));
       // visibleElements.flowers.push(...chunk.flowers.filter(isElementVisible));
     }

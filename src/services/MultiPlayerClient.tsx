@@ -74,43 +74,13 @@ class MultiplayerClient {
         this.username = username;
         this.worldId = worldId;
         
-        console.log(`Connecting to server at ${serverUrl}...`);
-        
-        // For development/testing without a real server
-        if (this.mockMode) {
-          console.log('🔧 Mock mode: Simulating successful connection');
-          this.isConnected = true;
-          this.playerId = 'mock-' + Math.random().toString(36).substring(2, 15);
-          
-          // Simulate receiving a player join event for self
-          setTimeout(() => {
-            this.handlePlayerJoin({
-              id: this.playerId,
-              username: this.username,
-              position: { x: 2500, y: 2500 },
-              direction: 'down',
-              isMoving: false,
-              lastUpdate: Date.now()
-            });
-            
-            // Generate some fake chunks
-            if (this.config) {
-              this.handleChunkUpdate(this.generateMockChunks(2500, 2500));
-            }
-            
-            // // Simulate other players
-            // this.simulateOtherPlayers();
-          }, 500);
-          
-          resolve(true);
-          return;
-        }
+        console.log(`[MultiplayerClient] Connecting to server at ${serverUrl} as ${username}`);
         
         this.socket = io(serverUrl);
         
         // Set up connection handlers
         this.socket.on('connect', () => {
-          console.log('Connected to server, sending join request');
+          console.log('[MultiplayerClient] Connected to server, sending join request');
           
           this.socket!.emit('player:join', {
             username: this.username,
@@ -120,70 +90,118 @@ class MultiplayerClient {
         
         // Handle successful join
         this.socket.on('player:joined', (data) => {
+          console.log('[MultiplayerClient] Received player:joined event:', data);
+          
+          // Add detailed player info log
+          console.log(`[DEBUG] Processing join for ${data.player.username} (${data.player.id}) - current client ID: ${this.playerId}`);
+          
           if (data.player.username === this.username && !this.playerId) {
             this.playerId = data.player.id;
             this.isConnected = true;
-            console.log(`Joined as player ${this.playerId}`);
+            console.log(`[MultiplayerClient] Joined as player ${this.playerId}`);
             resolve(true);
+            return;
           }
           
-          // Always notify handlers about the player join
-          this.handlePlayerJoin(data.player);
+          if (data.player.id !== this.playerId) {
+            console.log(`[MultiplayerClient] Another player joined: ${data.player.username} (${data.player.id})`);
+            this.handlePlayerJoin(data.player);
+          } else {
+            console.log('[DEBUG] Ignoring self-join event');
+          }
         });
         
         // Handle player leave
         this.socket.on('player:left', (data) => {
+          console.log(`[MultiplayerClient] Player left: ${data.playerId}`);
           this.handlePlayerLeave(data.playerId);
         });
         
         // Handle player movement
         this.socket.on('player:move', (event) => {
-          const { playerId, position, direction, isMoving } = event.data;
-          this.handlePlayerMove(playerId, position, direction, isMoving);
+          try {
+            console.log("🔄 Raw movement event:", event);
+            const { playerId, position, direction, isMoving } = event.data;
+            
+            // Skip our own movements (server already echoed them back)
+            if (playerId === this.playerId) {
+              console.log("Skipping own movement event");
+              return;
+            }
+            
+            console.log(`Remote movement: ${playerId} to (${position.x}, ${position.y})`);
+            this.handlePlayerMove(playerId, position, direction, isMoving);
+          } catch (error) {
+            console.error("Error processing movement event:", error);
+          }
         });
-        
         // Handle chat messages
         this.socket.on('chat:message', (event) => {
+          console.log('[MultiplayerClient] Received chat message:', event.data);
           const { playerId, username, message } = event.data;
           this.handleChatMessage(playerId, username, message);
         });
         
         // Handle chunk updates
         this.socket.on('world:chunks', (data) => {
+          console.log(`[MultiplayerClient] Received ${data.chunks.length} world chunks`);
           this.handleChunkUpdate(data.chunks);
         });
         
         // Handle existing players data
         this.socket.on('world:players', (data) => {
+          console.log('[MultiplayerClient] Received existing players:', data.players);
           data.players.forEach((player: RemotePlayer) => {
-            this.handlePlayerJoin(player);
+            console.log(`[DEBUG] Processing existing player ${player.username} (${player.id}) - current client ID: ${this.playerId}`);
+            
+            if (player.id !== this.playerId) {
+              console.log(`[MultiplayerClient] Adding existing player: ${player.username}`);
+              this.handlePlayerJoin(player);
+            } else {
+              console.log('[DEBUG] Skipping self in existing players');
+            }
           });
         });
         
+        
         // Handle errors
         this.socket.on('error', (data) => {
-          console.error('Server error:', data.message);
+          console.error('[MultiplayerClient] Server error:', data.message);
           this.handleError(data.message);
           reject(new Error(data.message));
         });
         
         // Handle disconnect
         this.socket.on('disconnect', () => {
-          console.log('Disconnected from server');
+          console.log('[MultiplayerClient] Disconnected from server');
           this.isConnected = false;
         });
         
-        // Handle server shutdown
-        this.socket.on('server:shutdown', (data) => {
-          console.log('Server is shutting down:', data.message);
-          this.isConnected = false;
+        // Handle connect_error - important for debugging
+        this.socket.on('connect_error', (error) => {
+          console.error('[MultiplayerClient] Connection error:', error);
+          this.handleError(`Connection error: ${error.message}`);
+          reject(error);
         });
         
       } catch (error) {
-        console.error('Error connecting to server:', error);
+        console.error('[MultiplayerClient] Error connecting to server:', error);
         reject(error);
       }
     });
+  }
+  
+  /**
+   * Send chat message
+   */
+  public sendChatMessage(message: string): void {
+    if (!this.isConnected || !this.socket) {
+      console.error('[MultiplayerClient] Cannot send message: not connected');
+      return;
+    }
+    
+    console.log(`[MultiplayerClient] Sending chat message: "${message}"`);
+    this.socket.emit('chat:message', message);
   }
   
   /**
@@ -222,26 +240,7 @@ class MultiplayerClient {
       });
     }
   }
-  
-  /**
-   * Send chat message
-   */
-  public sendChatMessage(message: string): void {
-    if (!this.isConnected) return;
-    
-    if (this.mockMode) {
-      // Simulate chat message in mock mode
-      setTimeout(() => {
-        this.handleChatMessage(this.playerId, this.username, message);
-      }, 100);
-      return;
-    }
-    
-    if (this.socket) {
-      this.socket.emit('chat:message', message);
-    }
-  }
-  
+
   /**
    * Set game configuration
    */
@@ -267,6 +266,7 @@ class MultiplayerClient {
    * Handler for player movement events
    */
   private handlePlayerMove(playerId: string, position: Position, direction: Direction, isMoving: boolean): void {
+    console.log(`🔄 RECEIVED MOVEMENT: Player ${playerId} to position (${position.x}, ${position.y}), isMoving: ${isMoving}`);
     this.playerMoveHandlers.forEach(handler => 
       handler(playerId, position, direction, isMoving)
     );
@@ -295,105 +295,7 @@ class MultiplayerClient {
     this.errorHandlers.forEach(handler => handler(message));
   }
   
-  /**
-   * Generates mock chunks for development/testing
-   */
-  private generateMockChunks(centerX: number, centerY: number): WorldChunk[] {
-    if (!this.config) return [];
-    
-    const chunks: WorldChunk[] = [];
-    const chunkSize = this.config.chunkSize;
-    
-    // Calculate chunk coordinates for center position
-    const centerChunkX = Math.floor(centerX / chunkSize);
-    const centerChunkY = Math.floor(centerY / chunkSize);
-    
-    // Generate a 3x3 grid of chunks around center
-    for (let x = centerChunkX - 1; x <= centerChunkX + 1; x++) {
-      for (let y = centerChunkY - 1; y <= centerChunkY + 1; y++) {
-        // Skip if out of world bounds
-        if (x < 0 || y < 0 || 
-            x * chunkSize >= this.config.worldWidth || 
-            y * chunkSize >= this.config.worldHeight) {
-          continue;
-        }
-        
-        // Use chunk coordinates as seed for consistent generation
-        const seed = x * 10000 + y;
-        const random = this.createSeededRandom(seed);
-        
-        // Create trees
-        const trees: Tree[] = [];
-        const treeCount = 5 + Math.floor(random() * 10);
-        
-        for (let i = 0; i < treeCount; i++) {
-          const size = 80 + Math.floor(random() * 40);
-          const treeX = x * chunkSize + Math.floor(random() * (chunkSize - size));
-          const treeY = y * chunkSize + Math.floor(random() * (chunkSize - size));
-          
-          trees.push({
-            id: 1000000 + seed * 100 + i,
-            x: treeX,
-            y: treeY,
-            size,
-            color: `hsl(${110 + random() * 30}, ${70 + random() * 10}%, ${35 + random() * 15}%)`,
-            variant: Math.floor(random() * 3)
-          });
-        }
-        
-        // Create bushes
-        const bushes: Bush[] = [];
-        const bushCount = 8 + Math.floor(random() * 7);
-        
-        for (let i = 0; i < bushCount; i++) {
-          const size = 40 + Math.floor(random() * 20);
-          const bushX = x * chunkSize + Math.floor(random() * (chunkSize - size));
-          const bushY = y * chunkSize + Math.floor(random() * (chunkSize - size));
-          
-          bushes.push({
-            id: 2000000 + seed * 100 + i,
-            x: bushX,
-            y: bushY,
-            size,
-            color: `hsl(${100 + random() * 50}, ${65 + random() * 15}%, ${30 + random() * 15}%)`,
-            variant: Math.floor(random() * 3)
-          });
-        }
-        
-        // Create flowers
-        const flowers: Flower[] = [];
-        const flowerCount = 15 + Math.floor(random() * 20);
-        const flowerColors = [
-          '#FF5733', '#DAF7A6', '#FFC300', '#C70039', 
-          '#900C3F', '#581845', '#FFFFFF', '#FFC0CB', '#3D85C6'
-        ];
-        
-        for (let i = 0; i < flowerCount; i++) {
-          const flowerX = x * chunkSize + Math.floor(random() * chunkSize);
-          const flowerY = y * chunkSize + Math.floor(random() * chunkSize);
-          
-          flowers.push({
-            id: 3000000 + seed * 100 + i,
-            x: flowerX,
-            y: flowerY,
-            color: flowerColors[Math.floor(random() * flowerColors.length)]
-          });
-        }
-        
-        // Add chunk to result
-        chunks.push({
-          x,
-          y,
-          trees,
-          bushes,
-          flowers,
-          isLoaded: true
-        });
-      }
-    }
-    
-    return chunks;
-  }
+
   
   /**
    * Creates seeded random number generator
@@ -406,150 +308,7 @@ class MultiplayerClient {
     };
   }
   
-  /**
-   * For mock mode: simulates other players joining and moving
-   */
-  // private simulateOtherPlayers(): void {
-  //   if (!this.mockMode) return;
-    
-  //   // Create 1-3 mock players
-  //   const mockPlayerCount = 1 + Math.floor(Math.random() * 3);
-    
-  //   for (let i = 0; i < mockPlayerCount; i++) {
-  //     const playerId = `mock-player-${i}`;
-  //     const playerName = `Player${i + 1}`;
-      
-  //     // Create player with offset from center
-  //     const offsetX = (Math.random() - 0.5) * 400;
-  //     const offsetY = (Math.random() - 0.5) * 400;
-      
-  //     const player: RemotePlayer = {
-  //       id: playerId,
-  //       username: playerName,
-  //       position: { 
-  //         x: 2500 + offsetX, 
-  //         y: 2500 + offsetY 
-  //       },
-  //       direction: ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)] as Direction,
-  //       isMoving: false,
-  //       lastUpdate: Date.now(),
-  //       animationFrame: 0
-  //     };
-      
-  //     // Add a delay before player joins
-  //     setTimeout(() => {
-  //       this.handlePlayerJoin(player);
-        
-  //       // Simulate player movement
-  //       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  //       let lastMoveTime = Date.now();
-        
-  //       // Move the player randomly every 3-8 seconds
-  //       const moveInterval = setInterval(() => {
-  //         if (!this.isConnected) {
-  //           clearInterval(moveInterval);
-  //           return;
-  //         }
-          
-  //         const now = Date.now();
-  //         const shouldMove = Math.random() > 0.3;  // 70% chance to move
-          
-  //         if (shouldMove) {
-  //           // Pick a random direction
-  //           const directions: Direction[] = ['up', 'down', 'left', 'right'];
-  //           const newDirection = directions[Math.floor(Math.random() * 4)];
-            
-  //           // Calculate new position
-  //           let newX = player.position.x;
-  //           let newY = player.position.y;
-  //           const moveDistance = 80 + Math.floor(Math.random() * 120);
-            
-  //           switch (newDirection) {
-  //             case 'up':
-  //               newY -= moveDistance;
-  //               break;
-  //             case 'down':
-  //               newY += moveDistance;
-  //               break;
-  //             case 'left':
-  //               newX -= moveDistance;
-  //               break;
-  //             case 'right':
-  //               newX += moveDistance;
-  //               break;
-  //           }
-            
-  //           // Keep within world bounds
-  //           if (this.config) {
-  //             newX = Math.max(0, Math.min(newX, this.config.worldWidth));
-  //             newY = Math.max(0, Math.min(newY, this.config.worldHeight));
-  //           }
-            
-  //           // Start moving
-  //           player.isMoving = true;
-  //           player.direction = newDirection;
-  //           this.handlePlayerMove(player.id, player.position, player.direction, player.isMoving);
-            
-  //           // Move for 1-3 seconds
-  //           const moveDuration = 1000 + Math.floor(Math.random() * 2000);
-            
-  //           // Update position periodically during movement
-  //           const updateInterval = setInterval(() => {
-  //             const progress = Math.min(1, (Date.now() - now) / moveDuration);
-              
-  //             // Linear interpolation
-  //             player.position = {
-  //               x: player.position.x + (newX - player.position.x) * 0.2,
-  //               y: player.position.y + (newY - player.position.y) * 0.2
-  //             };
-              
-  //             this.handlePlayerMove(player.id, player.position, player.direction, player.isMoving);
-              
-  //             // Check if we've reached the destination
-  //             if (progress >= 1) {
-  //               clearInterval(updateInterval);
-  //               player.isMoving = false;
-  //               this.handlePlayerMove(player.id, player.position, player.direction, player.isMoving);
-  //             }
-  //           }, 100);
-            
-  //           // Stop after the move duration
-  //           setTimeout(() => {
-  //             clearInterval(updateInterval);
-  //             player.isMoving = false;
-  //             this.handlePlayerMove(player.id, player.position, player.direction, player.isMoving);
-  //           }, moveDuration);
-  //         }
-          
-  //         lastMoveTime = now;
-  //       }, 3000 + Math.floor(Math.random() * 5000));
-        
-  //       // Simulate chat messages occasionally
-  //       setTimeout(() => {
-  //         if (this.isConnected) {
-  //           const messages = [
-  //             "Hello there!",
-  //             "This world is beautiful!",
-  //             "Nice to meet you!",
-  //             "How's it going?",
-  //             "Look at those trees!",
-  //             "I found some nice flowers over here",
-  //             "This is so cool",
-  //             "I like exploring this forest"
-  //           ];
-            
-  //           this.handleChatMessage(
-  //             player.id, 
-  //             player.username, 
-  //             messages[Math.floor(Math.random() * messages.length)]
-  //           );
-  //         }
-  //       }, 5000 + Math.floor(Math.random() * 15000));
-        
-  //     }, 2000 + i * 1000);
-  //   }
-  // }
-  
+
   /**
    * Add event handlers
    */
@@ -617,6 +376,52 @@ class MultiplayerClient {
   public getPlayerId(): string {
     return this.playerId;
   }
+
+  // Add this method to the MultiplayerClient class
+public simulatePlayerMovement(playerId: string): void {
+  console.log("Simulating movement for player:", playerId);
+  
+  // Get the current player data
+  const players = Array.from(document.querySelectorAll('[data-player-id]'))
+    .map(el => ({
+      id: el.getAttribute('data-player-id'),
+      position: {
+        x: parseFloat(el.getAttribute('data-pos-x') || '0'),
+        y: parseFloat(el.getAttribute('data-pos-y') || '0')
+      }
+    }));
+    
+  const playerToMove = players.find(p => p.id === playerId);
+  
+  if (!playerToMove) {
+    console.warn("Could not find player to move:", playerId);
+    return;
+  }
+  
+  // Create a random movement within a 50px radius
+  const newPosition = {
+    x: playerToMove.position.x + (Math.random() * 100 - 50),
+    y: playerToMove.position.y + (Math.random() * 100 - 50)
+  };
+  
+  // Simulate receiving a movement update
+  this.handlePlayerMove(
+    playerId, 
+    newPosition, 
+    ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)] as Direction, 
+    true
+  );
+  
+  // After a moment, stop moving
+  setTimeout(() => {
+    this.handlePlayerMove(
+      playerId, 
+      newPosition, 
+      ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)] as Direction, 
+      false
+    );
+  }, 1000);
+}
 }
 
 // Create singleton instance

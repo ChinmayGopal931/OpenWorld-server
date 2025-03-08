@@ -41,11 +41,11 @@ export const MiniMap: React.FC<MiniMapProps> = ({
         border: '3px solid rgba(255, 255, 255, 0.7)',
         borderRadius: '8px',
         overflow: 'hidden',
-        zIndex: 2000
+        zIndex: 99999
       }}
     >
       {/* Trees representation on mini map */}
-      {worldElements.trees.map(tree => (
+      {/* {worldElements.trees.map(tree => (
         <div 
           key={`mini-tree-${tree.id}`}
           style={{
@@ -58,10 +58,10 @@ export const MiniMap: React.FC<MiniMapProps> = ({
             borderRadius: '50%'
           }}
         />
-      ))}
+      ))} */}
       
       {/* Bushes representation on mini map */}
-      {worldElements.bushes.map(bush => (
+      {/* {worldElements.bushes.map(bush => (
         <div 
           key={`mini-bush-${bush.id}`}
           style={{
@@ -74,7 +74,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({
             borderRadius: '50%'
           }}
         />
-      ))}
+      ))} */}
       
       {/* Player position indicator */}
       <div

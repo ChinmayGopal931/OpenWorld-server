@@ -1,249 +1,376 @@
-// file: src/components/game/Character.tsx
 import React from 'react';
-import { Position, Direction } from '../utils/game';
+import { Position, Direction } from '../utils/game'; // Assuming these types are defined elsewhere
 
 interface CharacterProps {
-  position: Position;
-  direction: Direction;
-  isMoving: boolean;
-  animationFrame: number;
-  size: number;
+  position: Position; // { x: number, y: number }
+  direction: Direction; // 'up' | 'down' | 'left' | 'right'
+  isMoving: boolean; // Whether the character is moving
+  animationFrame: number; // 0 to 5, for animation cycling
+  size?: number; // Size of the character container in pixels
 }
 
-const Character: React.FC<CharacterProps> = ({ 
-  position, 
-  direction, 
-  isMoving, 
-  animationFrame,
-  size 
+const Character: React.FC<CharacterProps> = ({
+  position,
+  direction = 'down',
+  isMoving = false,
+  animationFrame = 0,
+  size = 64,
 }) => {
-  // Calculate animation offsets
-  const bodyOffset = isMoving ? [0, -2, -1, 0, -1, -2][animationFrame] : 0;
-  const walkCycle = isMoving ? [0, 1, 2, 3, 2, 1][animationFrame] : 0;
-  
+  // Animation offsets and rotations
+  const bodyOffset = isMoving ? [0, -4, -2, 0, -2, -4][animationFrame] : 0;
+  const leftLegOffset = isMoving ? [0, -8, -12, -8, -4, 0][animationFrame] : 0;
+  const rightLegOffset = isMoving ? [0, -4, -8, -12, -8, -4][animationFrame] : 0;
+  const leftArmRotation = isMoving ? [0, 30, 45, 30, 15, 0][animationFrame] : 0;
+  const rightArmRotation = isMoving ? [0, -15, -30, -45, -30, -15][animationFrame] : 0;
+
+  // Directional adjustments for face
+  const eyeOffsetX = direction === 'left' ? -4 : direction === 'right' ? 4 : 0;
+  const eyeOffsetY = direction === 'up' ? -4 : direction === 'down' ? 4 : 0;
+  const pupilOffsetX = direction === 'left' ? -1 : direction === 'right' ? 1 : 0;
+  const pupilOffsetY = direction === 'up' ? -1 : direction === 'down' ? 1 : 0;
+  const mouthOffsetX = direction === 'left' ? -2 : direction === 'right' ? 2 : 0;
+  const mouthOffsetY = direction === 'up' ? -2 : direction === 'down' ? 2 : 0;
+
   return (
-    <div 
+    <div
       style={{
         position: 'absolute',
         width: `${size}px`,
         height: `${size}px`,
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        zIndex: 1000 // Always render character on top
+        left: position.x,
+        top: position.y,
+        imageRendering: 'pixelated',
+        transform: 'scale(0.65)', // Adjust scale as needed
+        zIndex: 1000,
       }}
     >
-      <div style={{
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-      }}>
-        {/* Shadow */}
-        <div 
-          style={{
-            position: 'absolute',
-            width: '40px',
-            height: '12px',
-            left: '12px',
-            bottom: '0px',
-            backgroundColor: 'black',
-            borderRadius: '50%',
-            opacity: 0.3,
-            filter: 'blur(3px)'
-          }}
-        />
-        
-        {/* Character Body */}
-        <div 
-          style={{
-            position: 'absolute',
-            width: '32px',
-            height: '36px',
-            left: '16px',
-            bottom: `${10 + bodyOffset}px`,
-            backgroundColor: '#3b82f6',
-            borderRadius: '8px 8px 0 0',
-            borderBottom: '2px solid #1e40af',
-            borderLeft: '2px solid #1e40af',
-            borderRight: '2px solid #1e40af',
-            zIndex: 2
-          }}
-        />
+      {/* Shadow */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '64px',
+          height: '16px',
+          left: '-8px',
+          bottom: '-12px',
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          borderRadius: '50%',
+          filter: 'blur(6px)',
+          transform: 'scale(1.2, 0.4)',
+        }}
+      />
 
-        {/* Character Outfit Details */}
-        <div 
+      {/* Body (Torso) */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '48px',
+          height: '64px',
+          left: '-8px',
+          bottom: `${16 + bodyOffset}px`,
+          background: 'linear-gradient(180deg, #A0D8EF 0%, #5FB3D4 100%)',
+          border: '3px solid #3B82F6',
+          borderRadius: '12px 12px 0 0',
+          boxShadow: 'inset 2px 2px 4px rgba(0,0,0,0.1)',
+        }}
+      />
+
+      {/* Shirt */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '42px',
+          height: '24px',
+          left: '-5px',
+          bottom: `${36 + bodyOffset}px`,
+          background: '#FFD700',
+          borderRadius: '8px',
+          border: '2px solid #E5C200',
+          boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.2)',
+        }}
+      />
+
+      {/* Belt */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '42px',
+          height: '4px',
+          left: '-5px',
+          bottom: `${32 + bodyOffset}px`,
+          background: '#333',
+          borderRadius: '2px',
+        }}
+      />
+
+      {/* Backpack */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '32px',
+          height: '40px',
+          left: '-16px',
+          bottom: `${40 + bodyOffset}px`,
+          background: '#EF4444',
+          borderRadius: '8px',
+          border: '3px solid #B91C1C',
+          boxShadow: '2px 2px 4px rgba(0,0,0,0.2)',
+          zIndex: 1,
+        }}
+      />
+
+      {/* Head */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '64px',
+          height: '64px',
+          left: '-16px',
+          bottom: `${72 + bodyOffset}px`,
+          background: '#FDE68A',
+          borderRadius: '50%',
+          border: '3px solid #92400E',
+          boxShadow: 'inset 2px 2px 4px rgba(0,0,0,0.1)',
+        }}
+      />
+
+      {/* Hair */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '72px',
+          height: '32px',
+          left: '-20px',
+          bottom: `${96 + bodyOffset}px`,
+          background: '#0F172A',
+          borderRadius: '50% 50% 0 0',
+          boxShadow: 'inset 2px 2px 4px rgba(0,0,0,0.2)',
+        }}
+      />
+
+      {/* Cap */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '68px',
+          height: '16px',
+          left: '-18px',
+          bottom: `${92 + bodyOffset}px`,
+          background: '#EF4444',
+          borderRadius: '50% 50% 0 0',
+          border: '3px solid #B91C1C',
+        }}
+      />
+
+      {/* Cap Logo */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '12px',
+          height: '12px',
+          left: '26px',
+          bottom: `${100 + bodyOffset}px`,
+          background: '#FFF',
+          borderRadius: '50%',
+        }}
+      />
+
+      {/* Left Eye */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '8px',
+          height: '8px',
+          left: `${8 + eyeOffsetX}px`,
+          bottom: `${80 + bodyOffset + eyeOffsetY}px`,
+          background: 'white',
+          borderRadius: '50%',
+          border: '1px solid black',
+        }}
+      >
+        <div
           style={{
             position: 'absolute',
-            width: '28px',
-            height: '10px',
-            left: '18px',
-            bottom: `${16 + bodyOffset}px`,
-            backgroundColor: '#1e40af',
-            borderRadius: '4px',
-            zIndex: 3
-          }}
-        />
-        
-        {/* Backpack */}
-        {(direction === 'right' || direction === 'down') && (
-          <div 
-            style={{
-              position: 'absolute',
-              width: '16px',
-              height: '22px',
-              left: '6px',
-              bottom: `${22 + bodyOffset}px`,
-              backgroundColor: '#ef4444',
-              borderRadius: '4px',
-              border: '2px solid #b91c1c',
-              zIndex: 1
-            }}
-          />
-        )}
-        
-        {/* Head */}
-        <div 
-          style={{
-            position: 'absolute',
-            width: '38px',
-            height: '38px',
-            left: '13px',
-            bottom: `${42 + bodyOffset}px`,
-            backgroundColor: '#fde68a',
+            width: '4px',
+            height: '4px',
+            left: `${2 + pupilOffsetX}px`,
+            top: `${2 + pupilOffsetY}px`,
+            background: 'black',
             borderRadius: '50%',
-            border: '2px solid #92400e',
-            zIndex: 2
           }}
         />
-        
-        {/* Hair */}
-        <div 
+      </div>
+
+      {/* Right Eye */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '8px',
+          height: '8px',
+          left: `${24 + eyeOffsetX}px`,
+          bottom: `${80 + bodyOffset + eyeOffsetY}px`,
+          background: 'white',
+          borderRadius: '50%',
+          border: '1px solid black',
+        }}
+      >
+        <div
           style={{
             position: 'absolute',
-            width: '42px',
-            height: '20px',
-            left: '11px',
-            bottom: `${60 + bodyOffset}px`,
-            backgroundColor: '#0f172a',
-            borderRadius: '8px 8px 0 0',
-            zIndex: 3
+            width: '4px',
+            height: '4px',
+            left: `${2 + pupilOffsetX}px`,
+            top: `${2 + pupilOffsetY}px`,
+            background: 'black',
+            borderRadius: '50%',
           }}
         />
-        
-        {/* Cap */}
-        <div 
+      </div>
+
+      {/* Mouth */}
+      <div
+        style={{
+          position: 'absolute',
+          width: '24px',
+          height: '4px',
+          left: `${4 + mouthOffsetX}px`,
+          bottom: `${72 + bodyOffset + mouthOffsetY}px`,
+          background: 'black',
+          borderRadius: '4px',
+        }}
+      />
+
+      {/* Left Arm with Hand */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '-12px',
+          bottom: `${40 + bodyOffset}px`,
+          width: '16px',
+          height: '32px',
+          transform: `rotate(${leftArmRotation}deg)`,
+          transformOrigin: 'top center',
+          zIndex: direction === 'left' ? 3 : 1,
+        }}
+      >
+        <div
+          style={{
+            width: '16px',
+            height: '32px',
+            background: '#3B82F6',
+            borderRadius: '8px',
+            border: '3px solid #1E40AF',
+          }}
+        />
+        <div
           style={{
             position: 'absolute',
-            width: '44px',
+            width: '12px',
             height: '12px',
-            left: '10px',
-            bottom: `${58 + bodyOffset}px`,
-            backgroundColor: '#ef4444',
-            borderRadius: '8px 8px 0 0',
-            zIndex: 4
+            left: '2px',
+            bottom: '-6px',
+            background: '#FDE68A',
+            borderRadius: '50%',
           }}
         />
-        <div 
+      </div>
+
+      {/* Right Arm with Hand */}
+      <div
+        style={{
+          position: 'absolute',
+          right: '-12px',
+          bottom: `${40 + bodyOffset}px`,
+          width: '16px',
+          height: '32px',
+          transform: `rotate(${rightArmRotation}deg)`,
+          transformOrigin: 'top center',
+          zIndex: direction === 'right' ? 3 : 1,
+        }}
+      >
+        <div
+          style={{
+            width: '16px',
+            height: '32px',
+            background: '#3B82F6',
+            borderRadius: '8px',
+            border: '3px solid #1E40AF',
+          }}
+        />
+        <div
           style={{
             position: 'absolute',
+            width: '12px',
+            height: '12px',
+            left: '2px',
+            bottom: '-6px',
+            background: '#FDE68A',
+            borderRadius: '50%',
+          }}
+        />
+      </div>
+
+      {/* Left Leg with Foot */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '0px',
+          bottom: '0px',
+          width: '20px',
+          height: '32px',
+          transform: `translateY(${leftLegOffset}px)`,
+        }}
+      >
+        <div
+          style={{
             width: '20px',
+            height: '32px',
+            background: '#1E3A8A',
+            borderRadius: '8px',
+            border: '3px solid #1E40AF',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            width: '24px',
             height: '8px',
-            left: '22px',
-            bottom: `${70 + bodyOffset}px`,
-            backgroundColor: '#ef4444',
+            left: '-2px',
+            bottom: '-4px',
+            background: '#333',
             borderRadius: '4px',
-            zIndex: 4,
-            border: '1px solid #b91c1c',
-            transform: 'rotate(-10deg)'
           }}
         />
-        
-        {/* Face elements based on direction */}
-        {direction === 'down' && (
-          <>
-            <div style={{ position: 'absolute', width: '5px', height: '5px', left: '21px', bottom: `${52 + bodyOffset}px`, backgroundColor: 'black', borderRadius: '50%', zIndex: 5 }} />
-            <div style={{ position: 'absolute', width: '5px', height: '5px', left: '38px', bottom: `${52 + bodyOffset}px`, backgroundColor: 'black', borderRadius: '50%', zIndex: 5 }} />
-            <div style={{ position: 'absolute', width: '14px', height: '3px', left: '25px', bottom: `${44 + bodyOffset}px`, backgroundColor: 'black', borderRadius: '4px', zIndex: 5 }} />
-          </>
-        )}
-        
-        {direction === 'up' && (
-          <>
-            <div style={{ position: 'absolute', width: '14px', height: '3px', left: '25px', bottom: `${52 + bodyOffset}px`, backgroundColor: 'black', borderRadius: '4px', zIndex: 5 }} />
-            <div style={{ position: 'absolute', width: '6px', height: '6px', left: '30px', bottom: `${46 + bodyOffset}px`, backgroundColor: '#fde68a', borderRadius: '50%', border: '1px solid #92400e', zIndex: 4 }} />
-          </>
-        )}
-        
-        {direction === 'left' && (
-          <>
-            <div style={{ position: 'absolute', width: '5px', height: '5px', left: '18px', bottom: `${52 + bodyOffset}px`, backgroundColor: 'black', borderRadius: '50%', zIndex: 5 }} />
-            <div style={{ position: 'absolute', width: '8px', height: '3px', left: '15px', bottom: `${44 + bodyOffset}px`, backgroundColor: 'black', borderRadius: '4px', zIndex: 5 }} />
-          </>
-        )}
-        
-        {direction === 'right' && (
-          <>
-            <div style={{ position: 'absolute', width: '5px', height: '5px', left: '41px', bottom: `${52 + bodyOffset}px`, backgroundColor: 'black', borderRadius: '50%', zIndex: 5 }} />
-            <div style={{ position: 'absolute', width: '8px', height: '3px', left: '41px', bottom: `${44 + bodyOffset}px`, backgroundColor: 'black', borderRadius: '4px', zIndex: 5 }} />
-          </>
-        )}
-        
-        {/* Arms */}
-        <div 
+      </div>
+
+      {/* Right Leg with Foot */}
+      <div
+        style={{
+          position: 'absolute',
+          right: '0px',
+          bottom: '0px',
+          width: '20px',
+          height: '32px',
+          transform: `translateY(${rightLegOffset}px)`,
+        }}
+      >
+        <div
           style={{
-            position: 'absolute',
-            width: '8px',
-            height: '20px',
-            left: '8px',
-            bottom: `${22 + bodyOffset}px`,
-            backgroundColor: '#3b82f6',
-            border: '2px solid #1e40af',
-            borderRadius: '4px',
-            transform: isMoving ? `rotate(${[10, 20, 30, 20, 10, 0][walkCycle]}deg)` : 'rotate(0deg)',
-            transformOrigin: 'top center',
-            zIndex: direction === 'left' ? 3 : 1
+            width: '20px',
+            height: '32px',
+            background: '#1E3A8A',
+            borderRadius: '8px',
+            border: '3px solid #1E40AF',
           }}
         />
-        <div 
+        <div
           style={{
             position: 'absolute',
-            width: '8px',
-            height: '20px',
-            right: '8px',
-            bottom: `${22 + bodyOffset}px`,
-            backgroundColor: '#3b82f6',
-            border: '2px solid #1e40af',
+            width: '24px',
+            height: '8px',
+            left: '-2px',
+            bottom: '-4px',
+            background: '#333',
             borderRadius: '4px',
-            transform: isMoving ? `rotate(${[0, 10, 20, 30, 20, 10][walkCycle]}deg)` : 'rotate(0deg)',
-            transformOrigin: 'top center',
-            zIndex: direction === 'right' ? 3 : 1
-          }}
-        />
-        
-        {/* Legs */}
-        <div 
-          style={{
-            position: 'absolute',
-            width: '12px',
-            height: '16px',
-            left: '18px',
-            bottom: '0px',
-            backgroundColor: '#1e3a8a',
-            borderRadius: '4px',
-            transform: isMoving ? `translateY(${[0, -4, -6, -4, -2, 0][walkCycle]}px)` : 'none',
-            zIndex: 2
-          }}
-        />
-        <div 
-          style={{
-            position: 'absolute',
-            width: '12px',
-            height: '16px',
-            right: '18px',
-            bottom: '0px',
-            backgroundColor: '#1e3a8a',
-            borderRadius: '4px',
-            transform: isMoving ? `translateY(${[0, -2, -4, -6, -4, -2][walkCycle]}px)` : 'none',
-            zIndex: 2
           }}
         />
       </div>
